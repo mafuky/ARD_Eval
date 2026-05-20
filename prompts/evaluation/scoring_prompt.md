@@ -14,58 +14,48 @@
 - 网络搜索
 
 ## 任务目标
-针对每个维度，请提供：
-- 原始分 (raw_score)：0 到 5 之间的整数
-- 加权分 (weighted_score)
-- 评分理由 (reason)
+针对评分细则中的每个维度，请仅提供：
+- 原始分 (raw_score)：整数，范围见评分细则中各维度的评分锚点
+- 评分理由 (reason)：依据该维度对应分数的锚点描述说明判分依据
 - 改进建议 (improvement_suggestion)
 最后提供：
-- 最终总分 (final_score)
-- 等级 (grade)
 - 综合评语 (overall_comment)
 
+不要输出 weighted_score、final_score 或 grade；这些由系统根据评分细则计算。
 请只输出 JSON，不要输出 markdown 代码块。
 输出必须符合给定 JSON Schema。
 
 JSON 格式如下：
 
 {
-  "final_score": 0,
-  "grade": "D",
   "dimension_scores": {
     "task_alignment": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     },
     "analytical_depth": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     },
     "business_insight": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     },
     "decision_usefulness": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     },
     "structure_and_communication": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     },
     "risk_and_boundary_awareness": {
       "raw_score": 0,
-      "weighted_score": 0,
       "reason": "",
       "improvement_suggestion": ""
     }

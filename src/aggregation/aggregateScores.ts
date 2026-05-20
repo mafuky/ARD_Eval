@@ -3,16 +3,12 @@ import path from "node:path";
 import { ScoreResult } from "../types.js";
 import { ensureDir, projectPath, readJson, writeText } from "../utils/fs.js";
 import { stageBanner } from "../utils/logger.js";
+import { buildPairs, PAIRING_DIMENSIONS } from "./pairing.js";
+import { computeGuardrails } from "./guardrails.js";
+import { CANONICAL_DIMENSIONS } from "../config/loadRubric.js";
 
 const DEFAULT_BATCH_ID = "batch_20260509";
-const DIMENSIONS = [
-  "task_alignment",
-  "analytical_depth",
-  "business_insight",
-  "decision_usefulness",
-  "structure_and_communication",
-  "risk_and_boundary_awareness",
-] as const;
+const DIMENSIONS = CANONICAL_DIMENSIONS;
 
 function csvEscape(value: unknown): string {
   const text = String(value ?? "");
@@ -138,6 +134,90 @@ function scorerAgreement(scores: ScoreResult[]): Array<Record<string, unknown>> 
     });
 }
 
+interface GenerationTrace {
+  provider: string;
+  context_path: string;
+  metrics?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    latency_ms?: number;
+    ttft_ms?: number;
+  };
+}
+
+function listFilesRecursive(rootDir: string, fileName: string): string[] {
+  if (!fs.existsSync(rootDir)) return [];
+
+  const results: string[] = [];
+
+  function walk(dir: string): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile() && entry.name === fileName) {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  walk(rootDir);
+  return results;
+}
+
+function contextFormatFromPath(contextPath: string): string {
+  const normalized = contextPath.split(path.sep).join("/");
+  const parts = normalized.split("/");
+  return parts.at(-2) ?? "unknown";
+}
+
+function generationMetricSummary(
+  traces: GenerationTrace[],
+  groupKey: (trace: GenerationTrace) => Record<string, unknown>,
+): Array<Record<string, unknown>> {
+  const groups = new Map<string, Record<string, unknown> & {
+    runs: number;
+    total_prompt_tokens: number;
+    total_completion_tokens: number;
+    total_tokens: number;
+    total_latency_ms: number;
+    total_ttft_ms: number;
+  }>();
+
+  for (const trace of traces) {
+    const keyFields = groupKey(trace);
+    const key = JSON.stringify(keyFields);
+    const metrics = trace.metrics ?? {};
+    const group = groups.get(key) ?? {
+      ...keyFields,
+      runs: 0,
+      total_prompt_tokens: 0,
+      total_completion_tokens: 0,
+      total_tokens: 0,
+      total_latency_ms: 0,
+      total_ttft_ms: 0,
+    };
+
+    group.runs += 1;
+    group.total_prompt_tokens += metrics.prompt_tokens ?? 0;
+    group.total_completion_tokens += metrics.completion_tokens ?? 0;
+    group.total_tokens += metrics.total_tokens ?? 0;
+    group.total_latency_ms += metrics.latency_ms ?? 0;
+    group.total_ttft_ms += metrics.ttft_ms ?? 0;
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].map((group) => ({
+    ...group,
+    avg_prompt_tokens: Math.round(group.total_prompt_tokens / group.runs),
+    avg_completion_tokens: Math.round(group.total_completion_tokens / group.runs),
+    avg_total_tokens: Math.round(group.total_tokens / group.runs),
+    avg_latency_ms: Math.round(group.total_latency_ms / group.runs),
+    avg_ttft_ms: Math.round(group.total_ttft_ms / group.runs),
+  }));
+}
+
 export async function aggregateScores(batchId = DEFAULT_BATCH_ID): Promise<number> {
   const runLevelDir = projectPath("batches", batchId, "evaluation_results", "run_level");
   const scores: ScoreResult[] = [];
@@ -158,9 +238,16 @@ export async function aggregateScores(batchId = DEFAULT_BATCH_ID): Promise<numbe
   const aggregatedDir = projectPath("batches", batchId, "evaluation_results", "aggregated");
   await ensureDir(aggregatedDir);
 
+  const generationTraceFiles = listFilesRecursive(
+    projectPath("batches", batchId, "generation_outputs"),
+    "generation_trace.json",
+  );
+  const generationTraces = generationTraceFiles.map((file) => JSON.parse(fs.readFileSync(file, "utf8")) as GenerationTrace);
+
   const allRows = scores.map((score) => ({
     task_id: score.task_id,
     sample_id: score.sample_id,
+    query_key: `${score.sample_id}__${score.query_id}`,
     query_id: score.query_id,
     model: score.model,
     scored_by: score.scored_by,
@@ -181,7 +268,7 @@ export async function aggregateScores(batchId = DEFAULT_BATCH_ID): Promise<numbe
 
   await writeText(path.join(aggregatedDir, "all_scores.csv"), `${toCsv(allRows)}\n`);
   await writeText(path.join(aggregatedDir, "condition_ranking.csv"), `${toCsv(rankBy(scores, (s) => `${s.context_level}_${s.context_format}`))}\n`);
-  await writeText(path.join(aggregatedDir, "query_ranking.csv"), `${toCsv(rankBy(scores, (s) => s.query_id))}\n`);
+  await writeText(path.join(aggregatedDir, "query_ranking.csv"), `${toCsv(rankBy(scores, (s) => `${s.sample_id}__${s.query_id}`))}\n`);
   await writeText(path.join(aggregatedDir, "model_ranking.csv"), `${toCsv(rankBy(scores, (s) => s.model))}\n`);
   await writeText(path.join(aggregatedDir, "context_level_ranking.csv"), `${toCsv(rankBy(scores, (s) => s.context_level))}\n`);
   await writeText(path.join(aggregatedDir, "context_format_ranking.csv"), `${toCsv(rankBy(scores, (s) => s.context_format))}\n`);
@@ -190,6 +277,68 @@ export async function aggregateScores(batchId = DEFAULT_BATCH_ID): Promise<numbe
   await writeText(path.join(aggregatedDir, "token_and_latency.csv"), `${toCsv(tokenAndLatencySummary(scores))}\n`);
   await writeText(path.join(aggregatedDir, "scorer_ranking.csv"), `${toCsv(rankBy(scores, (s) => s.scored_by))}\n`);
   await writeText(path.join(aggregatedDir, "scorer_agreement.csv"), `${toCsv(scorerAgreement(scores))}\n`);
+
+  const pairing = buildPairs(scores);
+  if (pairing.pairs.length > 0) {
+    await writeText(
+      path.join(aggregatedDir, "pairing_deltas.csv"),
+      `${toCsv(
+        pairing.pairs.map((pair) => ({
+          sample_id: pair.sample_id,
+          query_id: pair.query_id,
+          model: pair.model,
+          context_format: pair.context_format,
+          run_id: pair.run_id,
+          scored_by: pair.scored_by,
+          arm: pair.arm,
+          base_final_score: pair.base_final_score,
+          arm_final_score: pair.arm_final_score,
+          delta_final_score: pair.delta_final_score,
+          ...Object.fromEntries(
+            PAIRING_DIMENSIONS.map((dimension) => [`delta_${dimension}`, pair.delta_dimensions[dimension]]),
+          ),
+        })),
+      )}\n`,
+    );
+
+    const guardrails = computeGuardrails(pairing.pairs);
+    await writeText(
+      path.join(aggregatedDir, "guardrail_direction_range.csv"),
+      `${toCsv(guardrails.direction_range.map((row) => ({ ...row })))}\n`,
+    );
+    await writeText(
+      path.join(aggregatedDir, "guardrail_sentinel.csv"),
+      `${toCsv(guardrails.sentinel.map((row) => ({ ...row })))}\n`,
+    );
+  }
+  if (pairing.skipped.length > 0) {
+    await writeText(path.join(aggregatedDir, "pairing_skipped.csv"), `${toCsv(pairing.skipped.map((row) => ({ ...row })))}\n`);
+  }
+
+  const generationFormatStats = generationMetricSummary(generationTraces, (trace) => ({
+    format: contextFormatFromPath(trace.context_path),
+  })).sort((a, b) => String(a.format).localeCompare(String(b.format)));
+  if (generationFormatStats.length > 0) {
+    await writeText(
+      path.join(aggregatedDir, "generation_format_stats.csv"),
+      `${toCsv(generationFormatStats)}\n`,
+    );
+  }
+
+  const generationModelFormatStats = generationMetricSummary(generationTraces, (trace) => ({
+    model: trace.provider,
+    format: contextFormatFromPath(trace.context_path),
+  })).sort((a, b) => {
+    const modelCmp = String(a.model).localeCompare(String(b.model));
+    if (modelCmp !== 0) return modelCmp;
+    return String(a.format).localeCompare(String(b.format));
+  });
+  if (generationModelFormatStats.length > 0) {
+    await writeText(
+      path.join(aggregatedDir, "generation_model_format_stats.csv"),
+      `${toCsv(generationModelFormatStats)}\n`,
+    );
+  }
 
   const overall = Number(average(scores.map((score) => score.final_score)).toFixed(2));
   const topCondition = rankBy(scores, (s) => `${s.context_level}_${s.context_format}`)[0];
@@ -204,7 +353,7 @@ export async function aggregateScores(batchId = DEFAULT_BATCH_ID): Promise<numbe
       `- Scorers: ${scorers.join(", ")}`,
       `- Average final score: ${overall}`,
       `- Primary metric: final_score`,
-      `- Queries evaluated: ${new Set(scores.map((score) => score.query_id)).size}`,
+      `- Queries evaluated: ${new Set(scores.map((score) => `${score.sample_id}__${score.query_id}`)).size}`,
       `- Top condition: ${topCondition?.name ?? "N/A"} (${topCondition?.avg_final_score ?? "N/A"})`,
       `- Top model: ${topModel?.name ?? "N/A"} (${topModel?.avg_final_score ?? "N/A"})`,
       ``,

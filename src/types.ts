@@ -28,7 +28,9 @@ export interface Manifest {
   experiment_name: string;
   experiment_type: string;
   sample_scope: string[];
-  query_set_path: string;
+  query_set_path?: string;
+  query_set_paths?: Record<string, string>;
+  scorers?: string[];
   factors: {
     context_level: ContextLevel[];
     context_format: ContextFormat[];
@@ -69,6 +71,17 @@ export interface Task {
 export interface TaskMatrix {
   batch_id: string;
   tasks: Task[];
+}
+
+export interface BarqDimensionOutput {
+  raw_score: number;
+  reason: string;
+  improvement_suggestion: string;
+}
+
+export interface BarqModelOutput {
+  dimension_scores: Record<string, BarqDimensionOutput>;
+  overall_comment: string;
 }
 
 export interface ScoreResult {

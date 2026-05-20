@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "tsx tests/coreFeatures.test.ts",
     "matrix": "npm run build && node dist/cli.js matrix",
     "payloads": "npm run build && node dist/cli.js payloads",
     "generate": "npm run build && node dist/cli.js generate",

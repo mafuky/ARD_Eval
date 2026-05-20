@@ -2,12 +2,43 @@ import fs from "node:fs";
 import YAML from "yaml";
 import { loadModelConfig, isMockMode } from "../config/loadConfig.js";
 import { callOpenAICompatible } from "../providers/openAICompatible.js";
-import { ApiMetrics, ScoreResult, TaskMatrix } from "../types.js";
+import { ApiMetrics, BarqModelOutput, Manifest, ScoreResult, TaskMatrix } from "../types.js";
 import { ensureDir, projectPath, readText, readYaml, writeJson } from "../utils/fs.js";
 import { stageBanner, progressLine, skipLine, failLine, summaryTable } from "../utils/logger.js";
 import { validateBarqScore } from "./validateBarqScore.js";
+import { loadRubric, type Rubric } from "../config/loadRubric.js";
 
 const DEFAULT_BATCH_ID = "batch_20260509";
+const MAX_SCORE_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryScoreError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("Missing API key env")) {
+    return false;
+  }
+
+  if (message.includes("Provider")) {
+    const statusMatch = message.match(/returned\s+(\d{3})/);
+    const status = statusMatch ? Number(statusMatch[1]) : null;
+    if (status === 429) return true;
+    if (status !== null && status >= 500) return true;
+    if (status !== null && status >= 400) return false;
+  }
+
+  return (
+    message.includes("empty completion") ||
+    message.includes("fetch failed") ||
+    message.includes("timeout") ||
+    message.includes("Unexpected end of JSON input") ||
+    message.includes("Invalid") ||
+    message.includes("JSON")
+  );
+}
 
 function extractJson(text: string): unknown {
   const fenced = text.match(/```json\s*([\s\S]*?)```/i);
@@ -15,65 +46,106 @@ function extractJson(text: string): unknown {
   return JSON.parse(candidate.trim());
 }
 
-function mockScore(task: TaskMatrix["tasks"][number], scoredBy: string): ScoreResult {
-  const contextBonus = task.context_level === "augmented" ? 4 : 0;
-  const formatBonus = task.context_format === "toon" ? 2 : 0;
-  const modelBonus = { openai: 3, gemini: 2, qwen: 1, deepseek: 1 }[task.model] ?? 0;
-  const scorerBonus = { openai: 1, gemini: 0, qwen: -1, deepseek: 0 }[scoredBy] ?? 0;
-  const finalScore = 78 + contextBonus + formatBonus + modelBonus + scorerBonus;
-  const grade = finalScore >= 90 ? "S" : finalScore >= 80 ? "A" : finalScore >= 70 ? "B" : finalScore >= 60 ? "C" : "D";
+interface ScoreMeta {
+  task_id: string;
+  sample_id: string;
+  query_id: string;
+  model: string;
+  context_level: string;
+  context_format: string;
+  run_id: string;
+  scored_by: string;
+}
 
+export function assembleScoreResult(
+  output: BarqModelOutput,
+  meta: ScoreMeta,
+  metrics: ApiMetrics,
+): ScoreResult {
+  const rubric = loadRubric();
+  const dimension_scores: ScoreResult["dimension_scores"] = {};
+  let finalScore = 0;
+
+  for (const dimension of rubric.dimensions) {
+    const dimOutput = output.dimension_scores[dimension.name]!;
+    const weightedScore = Number(((dimOutput.raw_score / rubric.rawScoreMax) * dimension.weight).toFixed(4));
+    dimension_scores[dimension.name] = {
+      raw_score: dimOutput.raw_score,
+      weighted_score: weightedScore,
+      reason: dimOutput.reason,
+      improvement_suggestion: dimOutput.improvement_suggestion,
+    };
+    if (dimension.role === "primary") {
+      finalScore += weightedScore;
+    }
+  }
+
+  finalScore = Number(finalScore.toFixed(2));
   return {
-    task_id: task.task_id,
-    sample_id: task.sample_id,
-    query_id: task.query_id,
-    model: task.model,
-    context_level: task.context_level,
-    context_format: task.context_format,
-    run_id: task.run_id,
-    scored_by: scoredBy,
+    ...meta,
     final_score: finalScore,
-    grade,
-    dimension_scores: {
-      task_alignment: {
-        raw_score: 4,
-        weighted_score: 16,
-        reason: `Mock score by ${scoredBy}: report responds to the configured user query.`,
-        improvement_suggestion: "In real scoring, make the conclusion more explicitly tied to the user query.",
-      },
-      analytical_depth: {
-        raw_score: 4,
-        weighted_score: 20,
-        reason: `Mock score by ${scoredBy}: analysis has a basic business reasoning chain.`,
-        improvement_suggestion: "In real scoring, expand the mechanism between data signals and business implications.",
-      },
-      business_insight: {
-        raw_score: 4,
-        weighted_score: 12,
-        reason: `Mock score by ${scoredBy}: report provides usable business observations.`,
-        improvement_suggestion: "In real scoring, make insights more differentiated and less generic.",
-      },
-      decision_usefulness: {
-        raw_score: 4,
-        weighted_score: 20,
-        reason: `Mock score by ${scoredBy}: conclusions can support a first-pass decision discussion.`,
-        improvement_suggestion: "In real scoring, clarify action priorities and decision conditions.",
-      },
-      structure_and_communication: {
-        raw_score: task.context_format === "toon" ? 5 : 4,
-        weighted_score: task.context_format === "toon" ? 10 : 8,
-        reason: `Mock score by ${scoredBy}: structure is readable.`,
-        improvement_suggestion: "In real scoring, improve section hierarchy and reduce repetition where needed.",
-      },
-      risk_and_boundary_awareness: {
-        raw_score: 3,
-        weighted_score: 3,
-        reason: `Mock score by ${scoredBy}: risk awareness is present but limited.`,
-        improvement_suggestion: "In real scoring, explicitly state assumptions, risks, and analytical boundaries.",
-      },
-    },
+    grade: rubric.gradeFor(finalScore),
+    dimension_scores,
+    overall_comment: output.overall_comment,
+    metrics,
+  };
+}
+
+export function renderRubricForPrompt(rubric: Rubric): string {
+  const lines = [
+    `评分细则：对下列每个维度给出 0 到 ${rubric.rawScoreMax} 的整数原始分 (raw_score)。` +
+      `仅评这些维度，不计算加权分、总分或等级。`,
+  ];
+  for (const dimension of rubric.dimensions) {
+    lines.push("", `## ${dimension.name}`, dimension.description, "评分锚点：");
+    for (let score = rubric.rawScoreMax; score >= 0; score -= 1) {
+      lines.push(`  ${score}: ${dimension.scale[score]}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export function patchOutputSchema(schemaYamlText: string, rawScoreMax: number): string {
+  const schema = YAML.parse(schemaYamlText) as {
+    $defs?: { dimension_score?: { properties?: { raw_score?: { maximum?: number } } } };
+  };
+  const rawScore = schema?.$defs?.dimension_score?.properties?.raw_score;
+  if (!rawScore) {
+    throw new Error("[output-schema] $defs.dimension_score.properties.raw_score not found");
+  }
+  rawScore.maximum = rawScoreMax;
+  return YAML.stringify(schema);
+}
+
+function mockScore(task: TaskMatrix["tasks"][number], scoredBy: string): ScoreResult {
+  const rubric = loadRubric();
+  const modelOutput: BarqModelOutput = {
+    dimension_scores: Object.fromEntries(
+      rubric.dimensions.map((dimension) => [
+        dimension.name,
+        {
+          raw_score: Math.round(rubric.rawScoreMax * 0.8),
+          reason: `Mock score by ${scoredBy}: ${dimension.name}.`,
+          improvement_suggestion: "Set ARD_EVAL_MOCK=0 to run real scoring.",
+        },
+      ]),
+    ),
     overall_comment: `Mock cross-score by ${scoredBy}. Replace ARD_EVAL_MOCK=0 to call the configured scoring model.`,
   };
+  return assembleScoreResult(
+    modelOutput,
+    {
+      task_id: task.task_id,
+      sample_id: task.sample_id,
+      query_id: task.query_id,
+      model: task.model,
+      context_level: task.context_level,
+      context_format: task.context_format,
+      run_id: task.run_id,
+      scored_by: scoredBy,
+    },
+    { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, latency_ms: 0, ttft_ms: 0 },
+  );
 }
 
 function scorePath(batchId: string, taskId: string, scoredBy: string): string {
@@ -82,11 +154,16 @@ function scorePath(batchId: string, taskId: string, scoredBy: string): string {
 
 export async function runBarqEvaluator(batchId = DEFAULT_BATCH_ID): Promise<number> {
   const matrix = await readYaml<TaskMatrix>(projectPath("batches", batchId, "task_matrix.yaml"));
+  const manifest = await readYaml<Manifest>(projectPath("batches", batchId, "manifest.yaml"));
   const modelConfig = await loadModelConfig();
   const scoringPromptTemplate = await readText(projectPath("prompts", "evaluation", "scoring_prompt.md"));
-  const rubric = await readText(projectPath("benchmark", "scoring_rubric.yaml"));
-  const outputSchema = await readText(projectPath("benchmark", "scoring_output_schema.yaml"));
-  const scorerNames = Object.keys(modelConfig.providers);
+  const rubricObj = loadRubric();
+  const rubric = renderRubricForPrompt(rubricObj);
+  const outputSchema = patchOutputSchema(
+    await readText(projectPath("benchmark", "scoring_output_schema.yaml")),
+    rubricObj.rawScoreMax,
+  );
+  const scorerNames = manifest.scorers ?? Object.keys(modelConfig.providers);
 
   await ensureDir(projectPath("batches", batchId, "evaluation_results", "run_level"));
 
@@ -128,7 +205,7 @@ export async function runBarqEvaluator(batchId = DEFAULT_BATCH_ID): Promise<numb
       }
 
       try {
-        let score: ScoreResult;
+        let score: ScoreResult | undefined;
         let metrics: ApiMetrics = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, latency_ms: 0, ttft_ms: 0 };
 
         if (isMockMode()) {
@@ -140,27 +217,51 @@ export async function runBarqEvaluator(batchId = DEFAULT_BATCH_ID): Promise<numb
             .replaceAll("{{generated_report}}", report)
             .replaceAll("{{scoring_rubric}}", rubric)
             .replaceAll("{{output_schema}}", outputSchema);
-          const result = await callOpenAICompatible({
-            providerName: scorerName,
-            provider,
-            model: provider.models.scoring,
-            messages: [{ role: "user", content: prompt }],
-          });
-          metrics = result.metrics;
-          const parsed = extractJson(result.content);
-          validateBarqScore(parsed);
-          score = {
-            task_id: task.task_id,
-            sample_id: task.sample_id,
-            query_id: task.query_id,
-            model: task.model,
-            context_level: task.context_level,
-            context_format: task.context_format,
-            run_id: task.run_id,
-            ...parsed,
-            scored_by: scorerName,
-            metrics,
-          };
+          let lastError: unknown;
+
+          for (let attempt = 1; attempt <= MAX_SCORE_ATTEMPTS; attempt += 1) {
+            try {
+              const result = await callOpenAICompatible({
+                providerName: scorerName,
+                provider,
+                model: provider.models.scoring,
+                messages: [{ role: "user", content: prompt }],
+              });
+              metrics = result.metrics;
+              const parsed = extractJson(result.content);
+              validateBarqScore(parsed);
+              score = assembleScoreResult(
+                parsed,
+                {
+                  task_id: task.task_id,
+                  sample_id: task.sample_id,
+                  query_id: task.query_id,
+                  model: task.model,
+                  context_level: task.context_level,
+                  context_format: task.context_format,
+                  run_id: task.run_id,
+                  scored_by: scorerName,
+                },
+                metrics,
+              );
+              lastError = undefined;
+              break;
+            } catch (error) {
+              lastError = error;
+              if (attempt >= MAX_SCORE_ATTEMPTS || !shouldRetryScoreError(error)) {
+                throw error;
+              }
+              await sleep(1000 * attempt);
+            }
+          }
+
+          if (lastError) {
+            throw lastError;
+          }
+        }
+
+        if (!score) {
+          throw new Error(`Scoring produced no result for ${task.task_id} by ${scorerName}`);
         }
 
         YAML.stringify(score);

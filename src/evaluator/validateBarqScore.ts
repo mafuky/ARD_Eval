@@ -1,15 +1,5 @@
-import { ScoreResult } from "../types.js";
-
-const DIMENSIONS = [
-  "task_alignment",
-  "analytical_depth",
-  "business_insight",
-  "decision_usefulness",
-  "structure_and_communication",
-  "risk_and_boundary_awareness",
-] as const;
-
-const GRADES = new Set(["S", "A", "B", "C", "D"]);
+import { BarqModelOutput } from "../types.js";
+import { loadRubric } from "../config/loadRubric.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -20,12 +10,6 @@ function assertNoExtraKeys(value: Record<string, unknown>, allowedKeys: string[]
     if (!allowedKeys.includes(key)) {
       throw new Error(`${path} has unexpected key: ${key}`);
     }
-  }
-}
-
-function assertNumber(value: unknown, path: string, min: number, max: number): void {
-  if (typeof value !== "number" || Number.isNaN(value) || value < min || value > max) {
-    throw new Error(`${path} must be a number between ${min} and ${max}`);
   }
 }
 
@@ -41,40 +25,33 @@ function assertString(value: unknown, path: string): void {
   }
 }
 
-export function validateBarqScore(value: unknown): asserts value is Omit<
-  ScoreResult,
-  "task_id" | "sample_id" | "query_id" | "model" | "context_level" | "context_format" | "run_id" | "scored_by"
-> {
+export function validateBarqScore(value: unknown): asserts value is BarqModelOutput {
+  const rubric = loadRubric();
+  const dimensions = rubric.dimensions.map((dimension) => dimension.name);
+
   if (!isObject(value)) {
     throw new Error("BARQ score must be an object");
   }
 
-  assertNoExtraKeys(value, ["dimension_scores", "final_score", "grade", "overall_comment"], "score");
-  assertNumber(value.final_score, "score.final_score", 0, 100);
-  const grade = value.grade;
-  assertString(grade, "score.grade");
-  if (!GRADES.has(grade as string)) {
-    throw new Error("score.grade must be one of S, A, B, C, D");
-  }
+  assertNoExtraKeys(value, ["dimension_scores", "overall_comment"], "score");
   assertString(value.overall_comment, "score.overall_comment");
 
   if (!isObject(value.dimension_scores)) {
     throw new Error("score.dimension_scores must be an object");
   }
-  assertNoExtraKeys(value.dimension_scores, [...DIMENSIONS], "score.dimension_scores");
+  assertNoExtraKeys(value.dimension_scores, dimensions, "score.dimension_scores");
 
-  for (const dimension of DIMENSIONS) {
+  for (const dimension of dimensions) {
     const dimensionScore = value.dimension_scores[dimension];
     if (!isObject(dimensionScore)) {
       throw new Error(`score.dimension_scores.${dimension} must be an object`);
     }
     assertNoExtraKeys(
       dimensionScore,
-      ["raw_score", "weighted_score", "reason", "improvement_suggestion"],
+      ["raw_score", "reason", "improvement_suggestion"],
       `score.dimension_scores.${dimension}`,
     );
-    assertInteger(dimensionScore.raw_score, `score.dimension_scores.${dimension}.raw_score`, 0, 5);
-    assertNumber(dimensionScore.weighted_score, `score.dimension_scores.${dimension}.weighted_score`, 0, 25);
+    assertInteger(dimensionScore.raw_score, `score.dimension_scores.${dimension}.raw_score`, 0, rubric.rawScoreMax);
     assertString(dimensionScore.reason, `score.dimension_scores.${dimension}.reason`);
     assertString(
       dimensionScore.improvement_suggestion,

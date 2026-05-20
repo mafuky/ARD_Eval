@@ -4,6 +4,9 @@ import { buildTaskMatrix } from "./matrix/buildTaskMatrix.js";
 import { buildPayloads } from "./payload/buildPayloads.js";
 import { runGeneration } from "./generation/runGeneration.js";
 import { runBarqEvaluator } from "./evaluator/runBarqEvaluator.js";
+import { checkSampleStructure } from "./validation/checkSampleStructure.js";
+import { Manifest } from "./types.js";
+import { projectPath, readYaml } from "./utils/fs.js";
 
 const command = process.argv[2];
 const batchId = process.argv[3] ?? "batch_20260509";
@@ -40,6 +43,21 @@ async function main(): Promise<void> {
       console.log(`Aggregated ${count} scores for ${batchId}`);
       break;
     }
+    case "check-structure": {
+      const manifest = await readYaml<Manifest>(projectPath("batches", batchId, "manifest.yaml"));
+      const errors = checkSampleStructure(projectPath("samples"), manifest.factors.context_format);
+      if (errors.length === 0) {
+        console.log(chalk.green(`✓ sample structure OK (formats: ${manifest.factors.context_format.join(", ")})`));
+        break;
+      }
+      console.error(chalk.red(`✗ ${errors.length} structural violation(s):`));
+      for (const error of errors) {
+        const where = [error.sample_id, error.arm, error.file].filter(Boolean).join(" / ");
+        console.error(chalk.red(`  - [${where}] ${error.problem}`));
+      }
+      process.exitCode = 1;
+      break;
+    }
     case "pipeline": {
       const pipelineStart = Date.now();
       console.log(chalk.bold.white("\n╔══════════════════════════════════════╗"));
@@ -56,7 +74,7 @@ async function main(): Promise<void> {
       break;
     }
     default:
-      console.log("Usage: npm run <matrix|payloads|generate|score|evaluate|aggregate|pipeline> [batch_id]");
+      console.log("Usage: npm run <matrix|payloads|generate|score|evaluate|aggregate|check-structure|pipeline> [batch_id]");
       process.exitCode = 1;
   }
 }

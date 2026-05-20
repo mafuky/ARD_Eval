@@ -1,6 +1,7 @@
 benchmark_id: BARQ_v1
 benchmark_name: Business Analysis Report Quality Benchmark
 score_scale: 100
+raw_score_max: 10
 
 scoring_mode: query_report_direct_scoring
 
@@ -11,9 +12,15 @@ inputs:
 dimensions:
   task_alignment:
     weight: 20
+    role: primary
     description: >
       Measures whether the report directly and sufficiently responds to the user's business analysis request.
     scale:
+      10: 完美回应用户任务、范围、分析深度和隐含目标，并在视角或呈现上超出预期。
+      9: 完整回应用户任务、对象、范围、分析深度和输出意图，无明显遗漏。
+      8: 覆盖绝大多数核心要求，但隐含目标或细节限定处理不够充分。
+      7: 基本完成主要任务，但少量范围或深度要求处理偏弱。
+      6: 回应主要任务，但遗漏了较重要的限定条件。
       5: 完整理解并回应 user_query 的核心任务、对象、范围、分析深度和输出意图。
       4: 基本回应 user_query，覆盖大部分核心要求，但少量限定条件或隐含目标处理不足。
       3: 只回应了 user_query 的一部分，方向相关但不够精准。
@@ -22,10 +29,16 @@ dimensions:
       0: 明显跑题，或没有回应 user_query。
 
   analytical_depth:
-    weight: 25
+    weight: 30
+    role: primary
     description: >
       Measures whether the report contains real business analysis rather than description, summary, or generic writing.
     scale:
+      10: 构建严密多维的分析链条，并讨论机制、影响、边界与失效情形。
+      9: 机制解释深入，数据支撑清晰，结论有较完整边界意识。
+      8: 机制解释清晰且有数据支撑，但边界讨论不足。
+      7: 有机制层分析，但支撑或二级推演仍可加强。
+      6: 有直接原因解释，但底层传导机制展开不足。
       5: 形成清晰分析链条：现象/数据 → 原因 → 机制 → 影响 → 结论。
       4: 有较完整分析逻辑，能解释主要原因和影响，但部分机制略薄。
       3: 有基本分析，但多停留在一级解释。
@@ -34,10 +47,16 @@ dimensions:
       0: 几乎没有分析。
 
   business_insight:
-    weight: 15
+    weight: 25
+    role: primary
     description: >
       Measures whether the report provides useful and non-trivial business insights.
     scale:
+      10: 洞察具前瞻性和非共识价值，能改变或显著强化商业决策。
+      9: 洞察有辨识度，准确指向关键驱动、竞争差异或风险机会。
+      8: 洞察有信息量，但与本案关键变量结合还可更紧。
+      7: 有明确商业判断，但多数观点仍接近行业常规认知。
+      6: 有一定见解，但多为常识推断，亮点不足。
       5: 洞察清晰、有辨识度、有商业价值，能识别关键驱动、竞争差异、风险变量或机会窗口。
       4: 有较好商业判断，但洞察独特性或穿透力略不足。
       3: 有一定洞察，但多数判断偏常规。
@@ -47,9 +66,15 @@ dimensions:
 
   decision_usefulness:
     weight: 25
+    role: primary
     description: >
       Measures whether the report can support business decisions or next-step actions.
     scale:
+      10: 结论明确、行动路径具体、优先级和落地条件清晰，可直接作为决策依据。
+      9: 结论和行动建议清晰可行，并交代关键落地条件。
+      8: 结论与行动路径清晰，但执行条件或风险预案不够充分。
+      7: 结论明确，但行动建议较粗，需要用户补充信息。
+      6: 指出大致方向，但结论或行动项不够明确。
       5: 结论明确，优先级清楚，能支持经营、投资、市场、战略、风险或资源配置判断。
       4: 对决策有较强参考价值，但行动路径或条件还可以更清晰。
       3: 有一定参考价值，但离直接支持决策还有距离。
@@ -59,9 +84,15 @@ dimensions:
 
   structure_and_communication:
     weight: 10
+    role: sentinel
     description: >
       Measures whether the report is well structured, readable, and professionally communicated.
     scale:
+      10: 结构层层递进，重点呈现极具引导性，语言精炼专业。
+      9: 框架清晰、重点突出、表达专业，整体沟通质量高。
+      8: 结构与重点到位，但语言有少量冗余或不够凝练。
+      7: 框架清楚，但核心结论不够突出。
+      6: 有基本结构，但层次和重点呈现偏弱。
       5: 结构清晰，层次递进，重点突出，语言专业且易读。
       4: 结构整体清楚，表达较专业，但局部层次或重点呈现可优化。
       3: 基本可读，但结构普通，重点不够突出。
@@ -71,9 +102,15 @@ dimensions:
 
   risk_and_boundary_awareness:
     weight: 5
+    role: observ
     description: >
       Measures whether the report recognizes uncertainty, assumptions, risks, and analytical boundaries.
     scale:
+      10: 系统说明数据假设、关键外部风险与结论适用前提。
+      9: 风险意识完整，说明数据假设、主要外部风险和结论边界。
+      8: 提示数据假设与外部风险，但结论限定不够充分。
+      7: 识别部分外部风险，但数据假设说明不足。
+      6: 零星提及风险，但不成体系。
       5: 明确识别关键风险、不确定性、假设条件和分析边界。
       4: 提到了主要风险或限制，但展开不够充分。
       3: 有基本风险意识，但比较笼统。
@@ -81,8 +118,9 @@ dimensions:
       1: 几乎没有风险意识，大量确定性判断。
       0: 完全无视不确定性。
 
-final_score_formula: >
-  sum((raw_score / 5) * weight)
+# final_score is computed in code from role:primary dimensions only:
+# sum((raw_score / raw_score_max) * weight). Sentinel/observ dimensions are
+# retained for diagnostics and guardrails but are not included in final_score.
 
 grade_mapping:
   S:

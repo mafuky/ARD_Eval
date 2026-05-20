@@ -2,8 +2,6 @@ type: object
 additionalProperties: false
 required:
   - dimension_scores
-  - final_score
-  - grade
   - overall_comment
 
 properties:
@@ -36,22 +34,6 @@ properties:
       risk_and_boundary_awareness:
         $ref: "#/$defs/dimension_score"
 
-  final_score:
-    type: number
-    minimum: 0
-    maximum: 100
-    description: Final weighted benchmark score.
-
-  grade:
-    type: string
-    enum:
-      - S
-      - A
-      - B
-      - C
-      - D
-    description: Grade mapped from final_score.
-
   overall_comment:
     type: string
     description: Overall evaluation comment.
@@ -62,21 +44,14 @@ $defs:
     additionalProperties: false
     required:
       - raw_score
-      - weighted_score
       - reason
       - improvement_suggestion
     properties:
       raw_score:
         type: integer
         minimum: 0
-        maximum: 5
-        description: Raw score for this dimension, from 0 to 5.
-
-      weighted_score:
-        type: number
-        minimum: 0
-        maximum: 25
-        description: Weighted score for this dimension after applying benchmark weight.
+        maximum: 10
+        description: Raw score for this dimension. Runtime patches maximum from rubric.raw_score_max.
 
       reason:
         type: string
