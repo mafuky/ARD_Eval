@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.DS_Store
+batches/**/generation_outputs/**
+batches/**/evaluation_results/**
+batches/**/generation_tasks/payloads/**
+batches/**/logs/*.log
+!batches/**/generation_outputs/.gitkeep
+!batches/**/evaluation_results/.gitkeep
+!batches/**/logs/.gitkeep
+/.idea/

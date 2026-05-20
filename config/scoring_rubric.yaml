@@ -1,0 +1,29 @@
+benchmark_id: BARQ_v1
+benchmark_name: Business Analysis Report Quality Benchmark
+score_scale: 100
+
+scoring_mode: query_report_direct_scoring
+
+inputs:
+  - user_query
+  - generated_report
+
+dimensions:
+  task_alignment:
+    weight: 20
+    description: Measures whether the report directly and sufficiently responds to the user's business analysis request.
+  analytical_depth:
+    weight: 25
+    description: Measures whether the report contains real business analysis rather than description, summary, or generic writing.
+  business_insight:
+    weight: 15
+    description: Measures whether the report provides useful and non-trivial business insights.
+  decision_usefulness:
+    weight: 25
+    description: Measures whether the report can support business decisions or next-step actions.
+  structure_and_communication:
+    weight: 10
+    description: Measures whether the report is well structured, readable, and professionally communicated.
+  risk_and_boundary_awareness:
+    weight: 5
+    description: Measures whether the report recognizes uncertainty, assumptions, risks, and analytical boundaries.

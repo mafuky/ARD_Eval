@@ -1,0 +1,7 @@
+sample_id: enterprise_maotai_001
+sample_type: enterprise
+subject_name: 贵州茅台
+language: zh-CN
+description: >
+  First enterprise sample used to evaluate business analysis report generation
+  under base and augmented context settings.

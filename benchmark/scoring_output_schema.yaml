@@ -1,0 +1,87 @@
+type: object
+additionalProperties: false
+required:
+  - dimension_scores
+  - final_score
+  - grade
+  - overall_comment
+
+properties:
+  dimension_scores:
+    type: object
+    additionalProperties: false
+    required:
+      - task_alignment
+      - analytical_depth
+      - business_insight
+      - decision_usefulness
+      - structure_and_communication
+      - risk_and_boundary_awareness
+    properties:
+      task_alignment:
+        $ref: "#/$defs/dimension_score"
+
+      analytical_depth:
+        $ref: "#/$defs/dimension_score"
+
+      business_insight:
+        $ref: "#/$defs/dimension_score"
+
+      decision_usefulness:
+        $ref: "#/$defs/dimension_score"
+
+      structure_and_communication:
+        $ref: "#/$defs/dimension_score"
+
+      risk_and_boundary_awareness:
+        $ref: "#/$defs/dimension_score"
+
+  final_score:
+    type: number
+    minimum: 0
+    maximum: 100
+    description: Final weighted benchmark score.
+
+  grade:
+    type: string
+    enum:
+      - S
+      - A
+      - B
+      - C
+      - D
+    description: Grade mapped from final_score.
+
+  overall_comment:
+    type: string
+    description: Overall evaluation comment.
+
+$defs:
+  dimension_score:
+    type: object
+    additionalProperties: false
+    required:
+      - raw_score
+      - weighted_score
+      - reason
+      - improvement_suggestion
+    properties:
+      raw_score:
+        type: integer
+        minimum: 0
+        maximum: 5
+        description: Raw score for this dimension, from 0 to 5.
+
+      weighted_score:
+        type: number
+        minimum: 0
+        maximum: 25
+        description: Weighted score for this dimension after applying benchmark weight.
+
+      reason:
+        type: string
+        description: Reason for the assigned score.
+
+      improvement_suggestion:
+        type: string
+        description: Suggestion for improving this dimension.

@@ -1,0 +1,29 @@
+providers:
+  openai:
+    label: GPT
+    base_url: KIMI_API_GATE_WAY
+    api_key_env: KIMI_API_KEY
+    models:
+      generation: kimi-k2.6
+      scoring: kimi-k2.6
+  gemini:
+    label: Gemini
+    base_url: COMMON_GATE_WAY
+    api_key_env: COMMON_API_KEY
+    models:
+      generation: gemini-3.1-pro-preview
+      scoring: gemini-3.1-pro-preview
+  qwen:
+    label: Qwen
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key_env: DASHSCOPE_API_KEY
+    models:
+      generation: qwen-max
+      scoring: qwen-max
+  deepseek:
+    label: DeepSeek
+    base_url: https://api.deepseek.com
+    api_key_env: DEEPSEEK_API_KEY
+    models:
+      generation: deepseek-v4-pro
+      scoring: deepseek-v4-pro

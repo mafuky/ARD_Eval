@@ -1,0 +1,28 @@
+{
+  "name": "ard-eval",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "matrix": "npm run build && node dist/cli.js matrix",
+    "payloads": "npm run build && node dist/cli.js payloads",
+    "generate": "npm run build && node dist/cli.js generate",
+    "score": "npm run build && node dist/cli.js score",
+    "evaluate": "npm run build && node dist/cli.js evaluate",
+    "aggregate": "npm run build && node dist/cli.js aggregate",
+    "pipeline": "npm run build && node dist/cli.js pipeline",
+    "check": "npm run build"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "dotenv": "^16.4.7",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

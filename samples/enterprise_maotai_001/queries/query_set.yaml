@@ -1,0 +1,13 @@
+query_set_id: maotai_barq_query_set_v1
+sample_id: enterprise_maotai_001
+description: >
+  用于测试模型在贵州茅台商业分析任务中的正向分析、反向分析和综合判断能力。
+
+queries:
+  - query_id: q1
+    query: >
+      给我做一个贵州茅台近两年在中国高端白酒市场的竞争态势分析
+
+  - query_id: q2
+    query: >
+      当行业头部竞争进入白热化，请分析茅台是否正在通过牺牲短期毛利指标，来加速对千元级价位段的降维打击，从而封堵竞对的增长空间？

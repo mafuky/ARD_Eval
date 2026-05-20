@@ -1,0 +1,26 @@
+benchmark_id: BARQ_v1
+
+benchmark_name: Business Analysis Report Quality Benchmark
+
+score_scale: 100
+
+description: >
+  BARQ evaluates whether a generated report is a high-quality business analysis
+  response to the given user query. The evaluator only receives the user query
+  and the generated report. It does not use source context, golden evidence,
+  reference answers, external search, claim extraction, or evidence matching.
+
+scoring_inputs:
+  - user_query
+  - generated_report
+  - scoring_rubric
+
+primary_metric: final_score
+
+dimensions:
+  - task_alignment
+  - analytical_depth
+  - business_insight
+  - decision_usefulness
+  - structure_and_communication
+  - risk_and_boundary_awareness

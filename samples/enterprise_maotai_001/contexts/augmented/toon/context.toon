@@ -1,0 +1,46 @@
+entity: 贵州茅台
+code: 600519
+period: 2026Q1_vs_2025Q1
+raw_data:
+  maotai:
+    2026:
+      total_revenue: 54703000000
+      revenue: 53909000000
+      net_profit: 27243000000
+      operating_cashflow: 26910000000
+      maotai_revenue: 46005000000
+      series_revenue: 7881000000
+      i_maotai_revenue: 21553000000
+    2025:
+      total_revenue: 51443000000
+      revenue: 50601000000
+      net_profit: 26847000000
+      operating_cashflow: 8809000000
+      maotai_revenue: 43557000000
+      series_revenue: 7022000000
+      i_maotai_revenue: 5870000000
+  competitor_wuliangye:
+    code: 000858
+    2025_q1_actual:
+      total_revenue: 36940000000
+      net_profit: 14860000000
+      operating_cashflow: 15849000000
+yoy_calculation_formulas:
+  maotai_total_revenue: (547.03 - 514.43) / 514.43 = 约 +6.34%
+  maotai_revenue: (539.09 - 506.01) / 506.01 = 约 +6.54%
+  maotai_net_profit: (272.43 - 268.47) / 268.47 = 约 +1.47%
+  maotai_operating_cashflow: (269.10 - 88.09) / 88.09 = 约 +205.48%
+  maotai_maotai_revenue: (460.05 - 435.57) / 435.57 = 约 +5.62%
+  maotai_series_revenue: (78.81 - 70.22) / 70.22 = 约 +12.22%
+  maotai_i_maotai_revenue: (215.53 - 58.70) / 58.70 = 约 +267.16%
+trend_indicators:
+  profit_margin_pressure: 营收增速6.54%，净利润增速仅1.47%，利润增速比收入增速低5.07个百分点。毛利率同比-2.2pct至89.8%，归母净利率同比-2.4pct至49.8%。
+  product_structure_shift: 系列酒增速12.22%高于茅台酒增速5.62%，系列酒收入占比从2025Q1的约12.2%升至2026Q1的14.4%。
+  channel_digital_surge: i茅台收入同比增长267.16%，占酒类总收入约40%。
+  cashflow_quality: 经营活动现金流净额同比增长205.48%。
+  competitor_baseline_2025: 以2025Q1为基期，茅台营收体量约五粮液的1.37倍（514.43亿 vs 369.40亿），净利体量约1.81倍（268.47亿 vs 148.60亿）。2025Q1五粮液经营现金流158.49亿元（同比+2970.31%），幅度更大含低基数因素。
+business_semantic_analysis:
+  profitability_quality: 2026Q1贵州茅台呈现'增收不增利'特征。低毛利的系列酒占比提升 + 茅台酒中非标产品占比下降共同导致毛利率同比下滑，净利润率从约53%降至50.5%。
+  digital_transformation: i茅台贡献收入215.53亿元，同比增长267.16%，占酒类总收入约40%。
+  cashflow_insight: 经营现金流净额269.10亿元，同比增长205.48%，远高于净利润增速。
+  demand_semaphore: i茅台贡献收入持续增加，i茅台的日均活跃访问量是目前预测茅台实际终端需求的最灵敏前导指标，建议持续追踪其与经销商批价的交叉验证。

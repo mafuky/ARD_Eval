@@ -1,0 +1,107 @@
+benchmark_id: BARQ_v1
+benchmark_name: Business Analysis Report Quality Benchmark
+score_scale: 100
+
+scoring_mode: query_report_direct_scoring
+
+inputs:
+  - user_query
+  - generated_report
+
+dimensions:
+  task_alignment:
+    weight: 20
+    description: >
+      Measures whether the report directly and sufficiently responds to the user's business analysis request.
+    scale:
+      5: 完整理解并回应 user_query 的核心任务、对象、范围、分析深度和输出意图。
+      4: 基本回应 user_query，覆盖大部分核心要求，但少量限定条件或隐含目标处理不足。
+      3: 只回应了 user_query 的一部分，方向相关但不够精准。
+      2: 与 user_query 有一定相关性，但主要是泛化分析。
+      1: 仅在主题上相关，实际内容基本没有完成用户任务。
+      0: 明显跑题，或没有回应 user_query。
+
+  analytical_depth:
+    weight: 25
+    description: >
+      Measures whether the report contains real business analysis rather than description, summary, or generic writing.
+    scale:
+      5: 形成清晰分析链条：现象/数据 → 原因 → 机制 → 影响 → 结论。
+      4: 有较完整分析逻辑，能解释主要原因和影响，但部分机制略薄。
+      3: 有基本分析，但多停留在一级解释。
+      2: 主要是描述和归纳，分析链条较弱。
+      1: 大量模板化表达，缺少实质分析。
+      0: 几乎没有分析。
+
+  business_insight:
+    weight: 15
+    description: >
+      Measures whether the report provides useful and non-trivial business insights.
+    scale:
+      5: 洞察清晰、有辨识度、有商业价值，能识别关键驱动、竞争差异、风险变量或机会窗口。
+      4: 有较好商业判断，但洞察独特性或穿透力略不足。
+      3: 有一定洞察，但多数判断偏常规。
+      2: 洞察较弱，主要是事实或行业常识总结。
+      1: 基本没有有效洞察，只有泛泛建议。
+      0: 没有商业洞察，或洞察与问题无关。
+
+  decision_usefulness:
+    weight: 25
+    description: >
+      Measures whether the report can support business decisions or next-step actions.
+    scale:
+      5: 结论明确，优先级清楚，能支持经营、投资、市场、战略、风险或资源配置判断。
+      4: 对决策有较强参考价值，但行动路径或条件还可以更清晰。
+      3: 有一定参考价值，但离直接支持决策还有距离。
+      2: 可读但决策指向较弱。
+      1: 几乎不能支持实际商业判断。
+      0: 对决策没有帮助，甚至可能误导。
+
+  structure_and_communication:
+    weight: 10
+    description: >
+      Measures whether the report is well structured, readable, and professionally communicated.
+    scale:
+      5: 结构清晰，层次递进，重点突出，语言专业且易读。
+      4: 结构整体清楚，表达较专业，但局部层次或重点呈现可优化。
+      3: 基本可读，但结构普通，重点不够突出。
+      2: 结构较乱，影响理解。
+      1: 表达混乱，阅读成本高。
+      0: 不成体系。
+
+  risk_and_boundary_awareness:
+    weight: 5
+    description: >
+      Measures whether the report recognizes uncertainty, assumptions, risks, and analytical boundaries.
+    scale:
+      5: 明确识别关键风险、不确定性、假设条件和分析边界。
+      4: 提到了主要风险或限制，但展开不够充分。
+      3: 有基本风险意识，但比较笼统。
+      2: 风险和边界意识较弱，结论略显武断。
+      1: 几乎没有风险意识，大量确定性判断。
+      0: 完全无视不确定性。
+
+final_score_formula: >
+  sum((raw_score / 5) * weight)
+
+grade_mapping:
+  S:
+    min: 90
+    max: 100
+    description: 优秀商业分析报告，可作为高质量分析初稿
+  A:
+    min: 80
+    max: 89.99
+    description: 较好的商业分析报告，少量修改即可使用
+  B:
+    min: 70
+    max: 79.99
+    description: 基本可用，但需要人工补充关键分析或结论
+  C:
+    min: 60
+    max: 69.99
+    description: 仅适合作为粗稿或思路参考
+  D:
+    min: 0
+    max: 59.99
+    description: 不符合商业分析报告质量要求
